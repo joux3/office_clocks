@@ -2,4 +2,4 @@
 
 ## Schematic
 
-![](schemantics.png?raw=true)
+![](schematic.png?raw=true)
