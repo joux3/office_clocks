@@ -11,3 +11,7 @@ pulse instead of generating a movement).
 ## Schematic
 
 ![](schematic.png?raw=true)
+
+## Prerequisites
+
+Install the `Time` library in Arduino IDE.
