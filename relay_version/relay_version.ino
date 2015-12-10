@@ -22,7 +22,7 @@ void setup() {
 }
 
 void sendSwitchPulse() {
-  // the clock expects every second pulse as with polarity inverted
+  // the clock expects every second pulse with polarity inverted
   int toSend = lastWasLow ? HIGH : LOW;
   lastWasLow = !lastWasLow;
   // set the bridge relays to correct
