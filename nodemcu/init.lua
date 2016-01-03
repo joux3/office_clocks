@@ -61,6 +61,7 @@ function tmr_now_with_overflows()
   if (now < tmr_now_last) then
     tmr_now_overflow_count = tmr_now_overflow_count + 1
   end
+  tmr_now_last = now
   return tmr_now_overflow_count * (2^31 - 1) + now
 end
 
