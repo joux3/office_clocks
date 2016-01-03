@@ -10,9 +10,12 @@
 -- is calculated for changes
 
 MICROSECONDS_IN_MINUTE = 60000000
+SNTP_HOST = "fi.pool.ntp.org"
 
 TIMER_POLL_TIME_AND_SWITCH = 0
 TIMER_PULSE_CONTROL = 1
+TIMER_TIME_SYNC_LOOP = 2
+TIMER_TIME_SYNC_ONCE = 3
 
 PIN_H_BRIDGE_ENABLE = 5
 PIN_H_BRIDGE_A = 6
@@ -21,6 +24,8 @@ PIN_INPUT_SWITCH = 0
 
 last_was_low = false
 has_time_synced = false
+initial_synced_time = 0
+fallback_seconds_over = 0
 
 -- init
 gpio.mode(PIN_H_BRIDGE_ENABLE, gpio.OUTPUT)
@@ -35,6 +40,7 @@ function send_pulse()
   if (pulse_in_progress) then
     return
   end
+  print("sending pulse")
   pulse_in_progress = true
   -- the clock expects every second pulse with polarity inverted
   last_was_low = not last_was_low
@@ -66,6 +72,7 @@ function tmr_now_with_overflows()
 end
 
 last_minute_count = 0
+last_synced_minute_count = 0
 function minute_has_changed()
   if (not has_time_synced) then
     local new_minute_count = math.floor(tmr_now_with_overflows() / MICROSECONDS_IN_MINUTE)
@@ -76,8 +83,51 @@ function minute_has_changed()
     end
     return false
   else
+    local time_elapsed = rtctime.get() - initial_synced_time + fallback_seconds_over
+    local new_minute_count = math.floor(time_elapsed / 60)
+    if (last_synced_minute_count ~= new_minute_count) then
+      print("minute has changed")
+      last_synced_minute_count = new_minute_count
+      return true
+    end
     return false
   end
+end
+
+-- time syncing
+
+time_sync_in_progress = false
+function sync_time()
+  if (time_sync_in_progress) then
+    return
+  end
+  print("syncing time...")
+  -- sntp.sync acecpts a DNS name, but work around issue #889 by manually resolving DNS name
+  net.dns.resolve(SNTP_HOST, function(sk, ip)
+    if (ip == nil) then
+      print("sntp dns resolve failed")
+      time_sync_in_progress = false
+    else
+      print("sntp dns resolved: " .. ip)
+      sntp.sync(ip, function(sec, usec, server)
+        -- sntp sync automatically updates rtctime when successful
+        print("sntp sync successful, cur time "..sec)
+        time_sync_in_progress = false
+        if (has_time_synced == false) then
+          has_time_synced = true
+          initial_synced_time = sec
+
+          -- FIXME: tmr_now_with_overflows might be over (fallback_minute_count + 1) * MICROSECONDS_IN_MINUTE
+          --        if the minute has just changed
+          local microseconds_over = tmr_now_with_overflows() % MICROSECONDS_IN_MINUTE
+          fallback_seconds_over = (microseconds_over / MICROSECONDS_IN_MINUTE) * 60
+        end
+      end, function()
+        print("sntp sync failed")
+        time_sync_in_progress = false
+      end)
+    end
+  end)
 end
 
 -- time and switch polling
@@ -87,3 +137,8 @@ tmr.alarm(TIMER_POLL_TIME_AND_SWITCH, 100, 1, function()
     send_pulse()
   end
 end)
+
+-- run sync_time once after 10 seconds
+tmr.alarm(TIMER_TIME_SYNC_ONCE, 10000, 0, sync_time)
+-- also sync the time once an hour
+tmr.alarm(TIMER_TIME_SYNC_LOOP, 1000 * 3600, 1, sync_time)
