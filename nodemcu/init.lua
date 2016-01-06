@@ -49,7 +49,7 @@ function send_pulse()
   gpio.write(PIN_H_BRIDGE_B, last_was_low and gpio.HIGH or gpio.LOW)
   -- send the pulse
   gpio.write(PIN_H_BRIDGE_ENABLE, gpio.HIGH)
-  tmr.alarm(TIMER_PULSE_CONTROL, 1000, 0, function()
+  tmr.alarm(TIMER_PULSE_CONTROL, 2000, 0, function()
     gpio.write(PIN_H_BRIDGE_ENABLE, gpio.LOW)
     tmr.alarm(TIMER_PULSE_CONTROL, 2500, 0, function()
       -- allow the clocks to change properly before sending another pulse
